@@ -19,7 +19,8 @@ class _NewItemState extends State<NewItem> {
   void _saveItem() {
     if (_formkey.currentState!.validate()) {
       _formkey.currentState!.save();
-      Navigator.of(context).pop(GroceryItem(id: DateTime.now().toString(),
+      Navigator.of(context).pop(GroceryItem(
+          id: DateTime.now().toString(),
           name: _enteredName,
           quantity: _enteredQuantity,
           category: _selectedCategory!));
