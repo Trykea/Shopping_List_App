@@ -19,24 +19,34 @@ class _NewItemState extends State<NewItem> {
   var _enteredName = '';
   var _enteredQuantity = 1;
   var _selectedCategory = categories[Categories.vegetables];
+  var _isSending = false;
 
-  void  _saveItem() async{
+  void _saveItem() async {
     if (_formkey.currentState!.validate()) {
       _formkey.currentState!.save();
-      final url = Uri.https('flutter-prep-f2f33-default-rtdb.asia-southeast1.firebasedatabase.app', 'shopping-list.json');
-     final respone= await http.post(url, headers: {
-        'Content-Type' : 'application/json'
-      }, body:
-        json.encode({
+      setState(() {
+        _isSending = true;
+
+      });
+      final url = Uri.https(
+          'flutter-prep-f2f33-default-rtdb.asia-southeast1.firebasedatabase.app',
+          'shopping-list.json');
+      final response = await http.post(
+        url,
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode({
           'name': _enteredName,
           'quantity': _enteredQuantity,
           'category': _selectedCategory!.title,
-        }), );
-     print(respone.body);
-     print(respone.statusCode);
-     if (!context.mounted)
-       return;
-     Navigator.of(context).pop();
+        }),
+      );
+      final Map<String, dynamic> resData = json.decode(response.body);
+      if (!context.mounted) return;
+      Navigator.of(context).pop(GroceryItem(
+          id: resData['name'],
+          name: _enteredName,
+          quantity: _enteredQuantity,
+          category: _selectedCategory!));
     }
   }
 
@@ -60,12 +70,8 @@ class _NewItemState extends State<NewItem> {
                   validator: (value) {
                     if (value == null ||
                         value.isEmpty ||
-                        value
-                            .trim()
-                            .length <= 1 ||
-                        value
-                            .trim()
-                            .length > 50) {
+                        value.trim().length <= 1 ||
+                        value.trim().length > 50) {
                       return 'Must between 1 and 50 characters';
                     }
                     return null;
@@ -103,30 +109,32 @@ class _NewItemState extends State<NewItem> {
                     ),
                     Expanded(
                       child: DropdownButtonFormField(
-                         value: _selectedCategory,   items: [
-
-                        for (final category in categories.entries)
-                          DropdownMenuItem(
-                              value: category.value,
-                              child: Row(
-                                children: [
-                                  Container(
-                                    width: 16,
-                                    height: 16,
-                                    color: category.value.color,
-                                  ),
-                                  const SizedBox(
-                                    width: 6,
-                                  ),
-                                  Text(category.value.title,
-                                    overflow: TextOverflow.ellipsis,),
-
-                                ],
+                          value: _selectedCategory,
+                          items: [
+                            for (final category in categories.entries)
+                              DropdownMenuItem(
+                                value: category.value,
+                                child: Row(
+                                  children: [
+                                    Container(
+                                      width: 16,
+                                      height: 16,
+                                      color: category.value.color,
+                                    ),
+                                    const SizedBox(
+                                      width: 6,
+                                    ),
+                                    Text(
+                                      category.value.title,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ],
+                                ),
                               ),
-                          ),
-                      ], onChanged: (value) {
-                        _selectedCategory = value! as Category?;
-                      }),
+                          ],
+                          onChanged: (value) {
+                            _selectedCategory = value! as Category?;
+                          }),
                     )
                   ],
                 ),
@@ -136,11 +144,15 @@ class _NewItemState extends State<NewItem> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.end,
                   children: [
-                    TextButton(onPressed: () {
-                      _formkey.currentState!.reset();
-                    }, child: const Text('Reset')),
+                    TextButton(
+                        onPressed: _isSending
+                            ? null
+                            : () {
+                                _formkey.currentState!.reset();
+                              },
+                        child: const Text('Reset')),
                     ElevatedButton(
-                        onPressed: _saveItem, child: const Text('Add Item')),
+                        onPressed: _isSending ? null : _saveItem, child: _isSending? SizedBox(width: 16, height: 16, child: CircularProgressIndicator(),)  :const Text('Add Item')),
                   ],
                 )
               ],
