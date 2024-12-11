@@ -16,58 +16,47 @@ class GroceryList extends StatefulWidget {
 
 class _GroceryListState extends State<GroceryList> {
   List<GroceryItem> _groceryItems = [];
-  var _isLoading = true;
+  late Future<List<GroceryItem>> _loadedItems;
   String? _error;
+
   @override
   void initState() {
     // TODO: implement initState
     super.initState();
-    _loadItem();
+    _loadedItems = _loadItem();
   }
 
-  void _loadItem() async {
+  Future<List<GroceryItem>> _loadItem() async {
     final url = Uri.https(
         'flutter-prep-f2f33-default-rtdb.asia-southeast1.firebasedatabase.app',
         'shopping-list.json');
-    try{
-      final respone = await http.get(url);
-      if (respone.statusCode >=400) {
-        setState(() {
-          _error = 'Failed to fetch data, please try again';
-        });
-      }
-      if (respone.body == 'null') {
-        setState(() {
-          _isLoading = false;
-        });
-        return;
-      }
-      final Map<String, dynamic> listdata =
-      json.decode(respone.body);
-      final List<GroceryItem> loadedItems = [];
-      for (final item in listdata.entries) {
-        final category = categories.entries
-            .firstWhere(
-                (catItem) => catItem.value.title == item.value['category'])
-            .value;
-        loadedItems.add(GroceryItem(
-            id: item.key,
-            name: item.value['name'],
-            quantity: item.value['quantity'],
-            category: category));
-      }
-      setState(() {
-        _groceryItems = loadedItems;
-        _isLoading = false;
-      });
+    final respone = await http.get(url);
+    if (respone.statusCode >= 400) {
+      throw Exception('Failed to fetch data, please try again');
+      // setState(() {
+      //   _error = ;
+      // });
     }
-    catch (error){
-      setState(() {
-        _error = 'Something went wrong, please try again';
-      });
+    if (respone.body == 'null') {
+      // setState(() {
+      //   _isLoading = false;
+      // });
+      return [];
     }
-
-
+    final Map<String, dynamic> listdata = json.decode(respone.body);
+    final List<GroceryItem> loadedItems = [];
+    for (final item in listdata.entries) {
+      final category = categories.entries
+          .firstWhere(
+              (catItem) => catItem.value.title == item.value['category'])
+          .value;
+      loadedItems.add(GroceryItem(
+          id: item.key,
+          name: item.value['name'],
+          quantity: item.value['quantity'],
+          category: category));
+    }
+    return loadedItems;
   }
 
   void _addItem() async {
@@ -91,7 +80,7 @@ class _GroceryListState extends State<GroceryList> {
     final url = Uri.https(
         'flutter-prep-f2f33-default-rtdb.asia-southeast1.firebasedatabase.app',
         'shopping-list/${item.id}.json');
-    final response =  await http.delete(url);
+    final response = await http.delete(url);
     if (response.statusCode >= 400) {
       setState(() {
         _groceryItems.insert(index, item);
@@ -101,62 +90,6 @@ class _GroceryListState extends State<GroceryList> {
 
   @override
   Widget build(BuildContext context) {
-    Widget content = Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          Container(
-            width: 200,
-            height: 200,
-            child: Image.network(
-              'https://cdn4.iconfinder.com/data/icons/office-vol-1-11/16/clipboard-empty-list-shipping-512.png',
-              fit: BoxFit.cover,
-              errorBuilder: (context, error, stackTrace) {
-                return const Text('Failed to load image');
-              },
-            ),
-          ),
-          const SizedBox(
-            height: 50,
-          ),
-          const Text(
-            'You have no item 💤💤',
-            style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-            textAlign: TextAlign.center,
-          )
-        ],
-      ),
-    );
-    if (_isLoading) {
-      content = const Center(child: CircularProgressIndicator(),);
-    }
-    if (_groceryItems.isNotEmpty) {
-      content = ListView.builder(
-          itemCount: _groceryItems.length,
-          itemBuilder: (ctx, index) =>
-              Dismissible(
-                  key: ValueKey(
-                    _groceryItems[index].id,
-                  ),
-                  onDismissed: (direction) {
-                    _removeItem(_groceryItems[index]);
-                  },
-                  child: ListTile(
-                    title: Text(_groceryItems[index].name),
-                    leading: Container(
-                      width: 24,
-                      height: 24,
-                      color: _groceryItems[index].category.color,
-                    ),
-                    trailing: Text(_groceryItems[index].quantity.toString()),
-                  )));
-    }
-    if (_error !=null) {
-      content = Center(child: Text(_error!),);
-
-
-    }
     return Scaffold(
       appBar: AppBar(
         title: const Text('Your groceries'),
@@ -167,7 +100,68 @@ class _GroceryListState extends State<GroceryList> {
           )
         ],
       ),
-      body: content,
+      body: FutureBuilder(
+        future: _loadedItems,
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(
+              child: CircularProgressIndicator(),
+            );
+          }
+          if (snapshot.hasError) {
+            return Center(
+              child: Text(snapshot.error.toString()),
+            );
+          }
+          if (snapshot.data!.isEmpty) {
+            return Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  Container(
+                    width: 200,
+                    height: 200,
+                    child: Image.network(
+                      'https://cdn4.iconfinder.com/data/icons/office-vol-1-11/16/clipboard-empty-list-shipping-512.png',
+                      fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) {
+                        return const Text('Failed to load image');
+                      },
+                    ),
+                  ),
+                  const SizedBox(
+                    height: 50,
+                  ),
+                  const Text(
+                    'You have no item 💤💤',
+                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                    textAlign: TextAlign.center,
+                  )
+                ],
+              ),
+            );
+          }
+          return ListView.builder(
+              itemCount: snapshot.data!.length,
+              itemBuilder: (ctx, index) => Dismissible(
+                  key: ValueKey(
+                    snapshot.data![index].id,
+                  ),
+                  onDismissed: (direction) {
+                    _removeItem(snapshot.data![index]);
+                  },
+                  child: ListTile(
+                    title: Text(snapshot.data![index].name),
+                    leading: Container(
+                      width: 24,
+                      height: 24,
+                      color: snapshot.data![index].category.color,
+                    ),
+                    trailing: Text(snapshot.data![index].quantity.toString()),
+                  )));
+        },
+      ),
     );
   }
 }
